@@ -1,4 +1,4 @@
-import { ExternalLink, Activity } from "lucide-react";
+import { ExternalLink, Activity, Trash2 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
@@ -17,17 +17,31 @@ export interface Service {
 interface ServiceCardProps {
   service: Service;
   onClick: () => void;
+  onDelete?: () => void; // <-- NEW
 }
 
-export function ServiceCard({ service, onClick }: ServiceCardProps) {
+export function ServiceCard({ service, onClick, onDelete }: ServiceCardProps) {
   const statusColor = service.status === "up" ? "bg-green-500" : "bg-red-500";
   const statusText = service.status === "up" ? "Up" : "Down";
 
   return (
     <Card
-      className="cursor-pointer overflow-hidden border-border bg-card p-0 transition-all hover:shadow-lg"
+      className="relative cursor-pointer overflow-hidden border-border bg-card p-0 transition-all hover:shadow-lg"
       onClick={onClick}
     >
+      {/* Delete Icon */}
+      {onDelete && (
+        <button
+          className="absolute right-2 top-2 rounded-md p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+          onClick={(e) => {
+            e.stopPropagation(); // prevents opening analytics
+            onDelete();
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+
       <div className="p-5">
         <div className="mb-4 flex items-start justify-between">
           <div className="flex-1">
@@ -40,6 +54,7 @@ export function ServiceCard({ service, onClick }: ServiceCardProps) {
                 {statusText}
               </Badge>
             </div>
+
             <a
               href={service.url}
               target="_blank"

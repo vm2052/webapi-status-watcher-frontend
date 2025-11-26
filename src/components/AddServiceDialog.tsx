@@ -19,19 +19,26 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Badge } from "./ui/badge";
+import { addService } from "../api/serviceApi";
 
 interface AddServiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onServiceAdded: () => void;   // <-- NEW CALLBACK
 }
 
-export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) {
+export function AddServiceDialog({
+  open,
+  onOpenChange,
+  onServiceAdded,
+}: AddServiceDialogProps) {
   const [serviceName, setServiceName] = useState("");
   const [url, setUrl] = useState("");
   const [interval, setInterval] = useState("60");
   const [statusCode, setStatusCode] = useState("200");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -44,21 +51,45 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
-  const handleSave = () => {
-    // Validation would go here
-    console.log("Saving service:", {
-      serviceName,
+  const clearFields = () => {
+    setServiceName("");
+    setUrl("");
+    setInterval("60");
+    setStatusCode("200");
+    setTags([]);
+    setTagInput("");
+  };
+
+  const handleSave = async () => {
+    if (!serviceName.trim() || !url.trim()) return;
+    console.log("SAVE CLICKED");
+    setSaving(true);
+
+    try {
+      await addService({
+      name: serviceName,
       url,
-      interval,
-      statusCode,
-      tags,
+      checkIntervalSeconds: Number(interval),
+
+      // The backend requires these:
+      lastChecked: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      isHealthy: true,                     // starting state
+      lastErrorMessage: ""              // optional
     });
-    onOpenChange(false);
+
+      clearFields();
+      onOpenChange(false);
+      onServiceAdded(); // <-- notify parent to reload list
+    } catch (err) {
+      console.error("Failed to add service", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePingNow = () => {
     console.log("Pinging endpoint:", url);
-    // Mock ping functionality
   };
 
   return (
@@ -76,9 +107,9 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
             <Label htmlFor="name">Service Name</Label>
             <Input
               id="name"
-              placeholder="My API Service"
               value={serviceName}
               onChange={(e) => setServiceName(e.target.value)}
+              placeholder="My API Service"
             />
           </div>
 
@@ -86,17 +117,17 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
             <Label htmlFor="url">URL / Endpoint</Label>
             <Input
               id="url"
-              placeholder="https://api.example.com/health"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://api.example.com/health"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="interval">Check Interval</Label>
+              <Label>Check Interval</Label>
               <Select value={interval} onValueChange={setInterval}>
-                <SelectTrigger id="interval">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -104,35 +135,32 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
                   <SelectItem value="60">1 minute</SelectItem>
                   <SelectItem value="300">5 minutes</SelectItem>
                   <SelectItem value="600">10 minutes</SelectItem>
-                  <SelectItem value="1800">30 minutes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="status-code">Expected Status</Label>
+              <Label>Expected Status</Label>
               <Select value={statusCode} onValueChange={setStatusCode}>
-                <SelectTrigger id="status-code">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="200">200 OK</SelectItem>
                   <SelectItem value="201">201 Created</SelectItem>
                   <SelectItem value="204">204 No Content</SelectItem>
-                  <SelectItem value="301">301 Redirect</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tags">Tags</Label>
+            <Label>Tags</Label>
             <div className="flex gap-2">
               <Input
-                id="tags"
-                placeholder="e.g., Payments, Internal"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
+                placeholder="Payments, Internal, etc."
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -140,10 +168,11 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
                   }
                 }}
               />
-              <Button type="button" variant="secondary" onClick={handleAddTag}>
+              <Button variant="secondary" onClick={handleAddTag}>
                 Add
               </Button>
             </div>
+
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {tags.map((tag) => (
@@ -162,17 +191,13 @@ export function AddServiceDialog({ open, onOpenChange }: AddServiceDialogProps) 
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePingNow}
-            className="gap-2"
-          >
+          <Button variant="outline" onClick={handlePingNow} className="gap-2">
             <Zap className="h-4 w-4" />
             Ping Now
           </Button>
-          <Button type="submit" onClick={handleSave}>
-            Save Service
+
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Service"}
           </Button>
         </DialogFooter>
       </DialogContent>
